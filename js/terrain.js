@@ -18,10 +18,16 @@ var filterType;
 
 var rectangles = [];
 
+var brushSize, brushMagnitude;
+
+var stats;
+
 $.ready(main());
 
 
 function main() {
+    setUpGUI();
+    setUpStats(document.body);
     init();
     animate();
 }
@@ -56,6 +62,8 @@ function init() {
 
     populateRectangles(scene);
 
+    brushSize = 0, brushMagnitude = 0;
+
     document.addEventListener('mousemove', onDocumentMouseMove, false);
     document.addEventListener('mousedown', onDocumentMouseDown, false);
     document.addEventListener('mouseup', onDocumentMouseUp, false);
@@ -70,8 +78,10 @@ function onWindowResize() {
 
 function animate() {
     requestAnimationFrame(animate);
+    stats.begin();
     controls.update();
     render();
+    stats.end();
 }
 
 function render() {
@@ -84,14 +94,11 @@ function render() {
 
             switch (MOUSEBTN) {
             case 1:
-                applyFilter(3);
-                //                INTERSECTED.position.y += 1;
-                break;
-            case 2:
-                applyFilter(3);
+                applyBrush(3);
                 break;
             case 3:
-                INTERSECTED.position.y -= 1;
+                applyBrush(1);
+                break;
             }
         }
     }
@@ -126,39 +133,12 @@ function populateRectangles(parent) {
 
         rectangle = new THREE.Mesh(geometry, material);
 
-        console.log(x + ' ' + z);
+        //        console.log(x + ' ' + z);
         rectangle.position.set(x, -255, z);
 
         rectangles.push(rectangle);
 
         parent.add(rectangle);
-    }
-}
-
-function applyFilter(filterType) {
-
-    var x = INTERSECTED.position.x;
-    var z = INTERSECTED.position.z;
-
-    var col = (x + ((GRID_SIZE * RECT_SIZE) / 2) - (RECT_SIZE / 2)) / RECT_SIZE;
-    var row = ((z - ((GRID_SIZE * RECT_SIZE) / 2) - (RECT_SIZE / 2)) / -RECT_SIZE) - 1;
-    var index = row * GRID_SIZE + col;
-
-    console.log(col + ' ' + row + ' ' + index);
-    var sigma = 1;
-    var strength = 1 / 49;
-    var width = 3;
-
-    switch (filterType) {
-    case 1:
-        applyBlurFilter(strength, width);
-        break;
-    case 2:
-        applyGaussianFilter(sigma, width);
-        break;
-    case 3:
-        gaussianAdd(.5, row, col);
-        break;
     }
 }
 
@@ -179,67 +159,32 @@ function onDocumentMouseUp(event) {
     MOUSEUP = true;
 }
 
-function gaussianAdd(sigma, row, col) {
-    var fWidth = Math.ceil(sigma * 3);
-    var fSize = (fWidth * 2) + 1;
-    var newRow = 0;
-    var newCol = 0;
-    var index, fIndex = 0;
-    var gFilter;
-    var magnitude = 20;
+function setUpGUI() {
+    var gui = new dat.GUI();
+    var options = {
+        viewMode: 'Orbital Control',
+        brushType: 'Gaussian',
+        brushSize: 0.5,
+        brushMagnitude: 10
+    };
 
-    gFilter = createGaussianFilter(sigma, magnitude);
+    gui.add(options, 'viewMode', ['Orbital Control', 'Orbit Mode', 'WASD Mode']);
 
-    for (var i = -fWidth; i <= fWidth; i++) {
-        for (var j = -fWidth; j <= fWidth; j++) {
-            newRow = row + i;
-            newCol = col + j;
-
-            if (newRow >= 0 && newRow < GRID_SIZE && newCol >= 0 && newCol < GRID_SIZE) {
-                index = (newRow * GRID_SIZE) + newCol;
-                rectangles[index].position.y += gFilter[fIndex];
-                console.log(gFilter[fIndex]);
-            }
-
-            fIndex += 1;
-        }
-    }
-
-
+    var f1 = gui.addFolder('Brush');
+    f1.add(options, 'brushType', ['Gaussian', 'Pinpoint']);
+    f1.add(options, 'brushSize', .5, 2).onChange(function (value) {
+        brushSize = value;
+    });
+    f1.add(options, 'brushMagnitude', -20, 20).onChange(function (value) {
+        brushMagnitude = value;
+    });
 }
 
-function applyBlurFilter(strength, width) {
-    var newRow, newCol, sum, index;
-
-    var sum = 0;
-
-    for (var row = 0; row < GRID_SIZE; row++) {
-        for (var col = 0; col < GRID_SIZE; col++) {
-
-            index = row * GRID_SIZE + col;
-
-            //row
-            for (var i = -width; i <= width; i++) {
-                //col
-                for (var j = -width; j <= width; j++) {
-                    newRow = row - i;
-                    newCol = col - j;
-
-                    if (newRow >= 0 && newRow < GRID_SIZE && newCol >= 0 && newCol < GRID_SIZE) {
-                        tempIndex = newRow * GRID_SIZE + newCol;
-
-                        index = newRow * GRID_SIZE + newCol;
-                        sum += rectangles[tempIndex].position.y * strength;
-                    }
-
-                }
-            }
-            console.log(sum);
-        }
-    }
-
-}
-
-function applyGaussianFilter(sigma, width) {
-
+function setUpStats(parent) {
+    stats = new Stats();
+    stats.domElement.style.position = 'absolute';
+    stats.domElement.style.left = '0px';
+    stats.domElement.style.top = '0px';
+    stats.setMode(0);
+    parent.appendChild(stats.domElement);
 }
