@@ -1,209 +1,245 @@
+var camera, scene, renderer, axes;
+var object;
+
+var raycaster, SELECTED, INTERSECTED;
+var mouse, objects;
+var theta, radius;
+var controls;
+
+var MOUSEDOWN, MOUSEUP, MOUSEBTN;
+
+var RECT_SIZE = 15;
+var RECT_HEIGHT = 256;
+
+var GRID_SIZE = 32;
+var NUM_CUBES = GRID_SIZE * GRID_SIZE;
+
+var filterType;
+
+var rectangles = [];
+
 $.ready(main());
 
-var width, height;
-var renderer, scene, camera, controls;
-var plane, cube, cubes, group;
-var stats, axes;
-var x, y, row, col;
-var TOTAL_CUBES, GRID;
-var CUBE_SIZE, wall_size, halfwall_size;
-var projector, mouse;
-var raycaster;
-
-var object;
-var objects;
-var INTERSECTED, SELECTED;
 
 function main() {
-    setUpGUI();
-    setUpStats(document.body);
     init();
     animate();
 }
 
 function init() {
-    width = window.innerWidth;
-    height = window.innerHeight;
+    MOUSEDOWN = false;
+    MOUSEUP = true;
 
-    objects = [];
-
-    renderer = new THREE.WebGLRenderer({
-        antialias: true
-    });
+    renderer = new THREE.WebGLRenderer();
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setClearColor(0xf0f0f0);
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.sortObjects = false;
+    document.body.appendChild(renderer.domElement);
 
-    scene = new THREE.Scene();
-    
-    //    camera = new THREE.PerspectiveCamera(45, width / height, .1, 10000);
     camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 1, 10000);
-    camera.position.y = 40;
-    camera.position.z = 40;
-    camera.lookAt(0, 0, 0);
+    camera.position.z = 400;
 
-    controls = new THREE.OrbitControls(camera, renderer.domElement);
-    group = new THREE.Object3D();
-    raycaster = new THREE.Raycaster();
-    projector = new THREE.Projector();
+    filterType = 0;
+    theta = 0;
+    radius = 100;
+    scene = new THREE.Scene();
     mouse = new THREE.Vector2();
+    raycaster = new THREE.Raycaster();
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    objects = [];
+    rectangles = [];
 
+    var light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(1, 1, 1).normalize();
+    scene.add(light);
 
-    axes = new THREE.AxisHelper(50);
-    scene.add(axes);
+    populateRectangles(scene);
 
-    CUBE_SIZE = 2;
-    GRID = 16;
-    TOTAL_CUBES = (GRID * GRID);
-
-    setUpCubes(group);
-    scene.add(group);
-    //    setUpCamera(0, 40, 40);
-    setUpLights(scene);
-    setUpRenderer(document.body);
-
-    renderer.domElement.addEventListener('mousemove', onDocumentMouseMove, false);
-    renderer.domElement.addEventListener('mousedown', onDocumentMouseDown, false);
-
-
+    document.addEventListener('mousemove', onDocumentMouseMove, false);
+    document.addEventListener('mousedown', onDocumentMouseDown, false);
+    document.addEventListener('mouseup', onDocumentMouseUp, false);
     window.addEventListener('resize', onWindowResize, false);
 }
 
-function update() {
-
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
 function animate() {
-    stats.begin();
-    update();
-    controls.update();
-
-    renderScene();
-    stats.end();
     requestAnimationFrame(animate);
+    controls.update();
+    render();
 }
 
-function renderScene() {
+function render() {
+    if (MOUSEDOWN) {
+        raycaster.setFromCamera(mouse, camera);
+        var intersects = raycaster.intersectObjects(scene.children);
+
+        if (intersects.length >= 1) {
+            INTERSECTED = intersects[0].object;
+
+            switch (MOUSEBTN) {
+            case 1:
+                applyFilter(3);
+                //                INTERSECTED.position.y += 1;
+                break;
+            case 2:
+                applyFilter(3);
+                break;
+            case 3:
+                INTERSECTED.position.y -= 1;
+            }
+        }
+    }
     renderer.render(scene, camera);
-    camera.updateMatrixWorld();
 }
 
-function de2ra(de) {
-    return (de * Math.PI) / 180;
-}
+function populateRectangles(parent) {
+    var x = 0;
+    var z = 0;
+    var row = 0;
+    var col = 0;
+    var rectangle;
+
+    var geometry = new THREE.BoxGeometry(RECT_SIZE, RECT_HEIGHT, RECT_SIZE);
+
+    for (var i = 0; i < NUM_CUBES; i++) {
+
+        var material = new THREE.MeshLambertMaterial({
+            color: Math.random() * 0xffffff
+        });
 
 
-function setUpCubes(parent) {
-    var cube;
-    var geom = new THREE.CubeGeometry(CUBE_SIZE * 0.9, CUBE_SIZE * 0.9, CUBE_SIZE * 0.9);
-    //var mat = new THREE.MeshBasicMaterial();
-    var mat = new THREE.MeshLambertMaterial({
-        color: 0xFF0000
-    });
-    x = y = row = col = 0;
-
-    for (var i = 0; i < TOTAL_CUBES; i++) {
-
-        cube = new THREE.Mesh(geom, mat);
-
-        if ((i % GRID) === 0) {
+        if ((i % GRID_SIZE) === 0) {
             col = 1;
             row++;
         } else {
             col++;
         }
 
-        x = -(((GRID * CUBE_SIZE) / 2) - ((CUBE_SIZE) * col) + (CUBE_SIZE / 2));
-        y = (((GRID * CUBE_SIZE) / 2) - ((CUBE_SIZE) * row) + (CUBE_SIZE / 2));
-        cube.position.set(x, 0, y);
+        x = -(((GRID_SIZE * RECT_SIZE) / 2) - ((RECT_SIZE) * col) + (RECT_SIZE / 2));
+        z = (((GRID_SIZE * RECT_SIZE) / 2) - ((RECT_SIZE) * row) + (RECT_SIZE / 2));
 
-        parent.add(cube);
+        rectangle = new THREE.Mesh(geometry, material);
+
+        console.log(x + ' ' + z);
+        rectangle.position.set(x, -255, z);
+
+        rectangles.push(rectangle);
+
+        parent.add(rectangle);
     }
 }
 
-function setUpRenderer(parent) {
-    renderer.setSize(width, height);
-    renderer.shadowMapEnabled = true;
-    renderer.shadowMapSoft = true;
-    parent.appendChild(renderer.domElement);
-}
+function applyFilter(filterType) {
 
-function setUpLights(parent) {
-    var light, spotLight, ambientLight;
+    var x = INTERSECTED.position.x;
+    var z = INTERSECTED.position.z;
 
-    //    spotLight = new THREE.SpotLight(0xffffff);
-    //    spotLight.position.set(0, 100, 0);
-    //    spotLight.castShadow = true;
-    //    spotLight.shadowMapWidth = 2048;
-    //    spotLight.shadowMapHeight = 2048;
-    //    spotLight.shadowCameraNear = 1;
-    //    spotLight.shadowCameraFar = 4000;
-    //    spotLight.shadowCameraFov = 45;
+    var col = (x + ((GRID_SIZE * RECT_SIZE) / 2) - (RECT_SIZE / 2)) / RECT_SIZE;
+    var row = ((z - ((GRID_SIZE * RECT_SIZE) / 2) - (RECT_SIZE / 2)) / -RECT_SIZE) - 1;
+    var index = row * GRID_SIZE + col;
 
-    // Create yellow light source and add it to the scene
-    var light = new THREE.DirectionalLight(0xffffff, 1);
-    light.position.set(1, 1, 1).normalize();
+    console.log(col + ' ' + row + ' ' + index);
+    var sigma = 1;
+    var strength = 1 / 49;
+    var width = 3;
 
-    //    ambientLight = new THREE.AmbientLight(0x101010);
-
-    parent.add(light);
-    //parent.add(spotLight);
-    //parent.add(ambientLight);
-}
-
-function setUpGUI() {
-    var ColorObject = function () {
-        this.color = [0, 128, 255, 0.3];
+    switch (filterType) {
+    case 1:
+        applyBlurFilter(strength, width);
+        break;
+    case 2:
+        applyGaussianFilter(sigma, width);
+        break;
+    case 3:
+        gaussianAdd(.5, row, col);
+        break;
     }
-    var colorObject = new ColorObject();
-
-    var gui = new dat.GUI();
-    var options = {
-        x: 0,
-        y: 0,
-        z: 0,
-        rotationX: 0,
-        rotationY: 0,
-        rotationZ: 0
-    };
 }
 
-function setUpStats(parent) {
-    stats = new Stats();
-    stats.domElement.style.position = 'absolute';
-    stats.domElement.style.left = '0px';
-    stats.domElement.style.top = '0px';
-    stats.setMode(0);
-    parent.appendChild(stats.domElement);
-}
-
-function onWindowResize() {
-
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-
-
-    renderer.setSize(window.innerWidth, window.innerHeight);
-
-}
-
-function onDocumentMouseMove() {
-
+function onDocumentMouseMove(event) {
     event.preventDefault();
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 }
 
-function onDocumentMouseDown() {
-    //console.log(mouse);
-    //console.log(camera.position);
-    //console.log(camera.position);
+function onDocumentMouseDown(event) {
+    MOUSEUP = false;
+    MOUSEDOWN = true;
+    MOUSEBTN = event.which;
+}
+
+function onDocumentMouseUp(event) {
+    MOUSEDOWN = false;
+    MOUSEUP = true;
+}
+
+function gaussianAdd(sigma, row, col) {
+    var fWidth = Math.ceil(sigma * 3);
+    var fSize = (fWidth * 2) + 1;
+    var newRow = 0;
+    var newCol = 0;
+    var index, fIndex = 0;
+    var gFilter;
+    var magnitude = 20;
+
+    gFilter = createGaussianFilter(sigma, magnitude);
+
+    for (var i = -fWidth; i <= fWidth; i++) {
+        for (var j = -fWidth; j <= fWidth; j++) {
+            newRow = row + i;
+            newCol = col + j;
+
+            if (newRow >= 0 && newRow < GRID_SIZE && newCol >= 0 && newCol < GRID_SIZE) {
+                index = (newRow * GRID_SIZE) + newCol;
+                rectangles[index].position.y += gFilter[fIndex];
+                console.log(gFilter[fIndex]);
+            }
+
+            fIndex += 1;
+        }
+    }
 
 
-    camera.updateMatrixWorld();
+}
 
-    // find intersections
-    var intersects = raycaster.intersectObjects(group.children);
-    console.log(intersects);
+function applyBlurFilter(strength, width) {
+    var newRow, newCol, sum, index;
+
+    var sum = 0;
+
+    for (var row = 0; row < GRID_SIZE; row++) {
+        for (var col = 0; col < GRID_SIZE; col++) {
+
+            index = row * GRID_SIZE + col;
+
+            //row
+            for (var i = -width; i <= width; i++) {
+                //col
+                for (var j = -width; j <= width; j++) {
+                    newRow = row - i;
+                    newCol = col - j;
+
+                    if (newRow >= 0 && newRow < GRID_SIZE && newCol >= 0 && newCol < GRID_SIZE) {
+                        tempIndex = newRow * GRID_SIZE + newCol;
+
+                        index = newRow * GRID_SIZE + newCol;
+                        sum += rectangles[tempIndex].position.y * strength;
+                    }
+
+                }
+            }
+            console.log(sum);
+        }
+    }
+
+}
+
+function applyGaussianFilter(sigma, width) {
+
 }
