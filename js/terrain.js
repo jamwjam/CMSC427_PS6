@@ -48,7 +48,6 @@ var guiOption = function () {
 var options = new guiOption();
 $.ready(main());
 
-
 function main() {
     setUpGUI();
     setUpStats(document.body);
@@ -137,8 +136,6 @@ function animate() {
 }
 
 function render() {
-
-    // Toggle castShadow
 
     // View Mode
     switch (options.viewMode) {
@@ -428,6 +425,7 @@ function setUpGUI() {
     f0.add(options, 'viewMode', ['Orbital Control', 'Orbit Mode', 'Stationary Mode']);
     f0.add(options, 'orbitViewTheta', 0, 360).listen();
     f0.add(options, 'orbitViewRadius', 100, 500);
+
     var f1 = gui.addFolder('Brush');
     f1.add(options, 'brushType', ['Gaussian', 'Pinpoint', 'Blur', 'Color']);
     f1.add(options, 'brushSize', .5, 2).onChange(function (value) {
@@ -440,6 +438,7 @@ function setUpGUI() {
 
     var f2 = gui.addFolder('Lighting');
     f2.add(options, 'toggleShadow');
+
     var f3 = gui.addFolder('Color');
     f3.addColor(options, 'color0').name('Color');
     f3.add(options, 'singleColor');
