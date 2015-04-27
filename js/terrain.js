@@ -1,15 +1,15 @@
-var camera, scene, renderer, axes;
-var object;
+var camera, scene, renderer;
 
 var raycaster, SELECTED, INTERSECTED;
-var mouse, objects;
+var mouse;
 var controls;
+var container;
 
 var MOUSEDOWN, MOUSEUP, MOUSEBTN;
 
 var RECT_SIZE = 15;
 var RECT_HEIGHT = 256;
-var GRID_SIZE = 32;
+var GRID_SIZE = 27;
 var NUM_CUBES = GRID_SIZE * GRID_SIZE;
 
 var filterType;
@@ -27,7 +27,7 @@ var guiOption = function () {
     this.viewMode = 'Orbit Mode';
     this.brushType = 'Gaussian';
     this.brushSize = 1.0;
-    this.brushMagnitude = 10;
+    this.brushMagnitude = 30;
     this.blurMagnitude = 0.13;
     this.orbitViewRadius = 400;
     this.orbitViewTheta = 0;
@@ -60,6 +60,11 @@ function init() {
     MOUSEDOWN = false;
     MOUSEUP = true;
 
+    container = document.getElementById("threejs");
+
+    document.body.appendChild(container);
+
+
     renderer = new THREE.WebGLRenderer();
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setClearColor(0xf0f0f0);
@@ -69,7 +74,9 @@ function init() {
     renderer.shadowMapEnabled = true;
     renderer.shadowMapType = THREE.PCFShadowMap;
 
-    document.body.appendChild(renderer.domElement);
+    //document.body.appendChild(renderer.domElement);
+
+    container.appendChild(renderer.domElement);
 
     camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 1, 10000);
     camera.position.z = 400;
@@ -80,7 +87,6 @@ function init() {
     mouse = new THREE.Vector2();
     raycaster = new THREE.Raycaster();
     controls = new THREE.OrbitControls(camera, renderer.domElement);
-    objects = [];
     rectangles = [];
 
 
@@ -177,12 +183,6 @@ function populateRectangles(parent) {
 
     for (var i = 0; i < NUM_CUBES; i++) {
 
-        //        var material = new THREE.MeshPhongMaterial({
-        //            color: 0xdddddd,
-        //            specular: 0x009900,
-        //            shininess: 30,
-        //            shading: THREE.FlatShading
-        //        });
         var material = new THREE.MeshLambertMaterial({
             color: Math.random() * 0xffffff
                 //color: 0xAAAAAA
@@ -392,7 +392,6 @@ function reset() {
 
 function setUpGUI() {
     var gui = new dat.GUI();
-
 
     var f0 = gui.addFolder('View Mode');
     f0.add(options, 'viewMode', ['Orbital Control', 'Orbit Mode', 'Stationary Mode']);
