@@ -251,6 +251,9 @@ function applyBrush() {
     case 'Blur':
         blurBrush(options.blurMagnitude, row, col);
         break;
+    case 'Color':
+        colorBrush(options.brushSize, options.color0, row, col);
+        break;
 
     }
 }
@@ -287,14 +290,19 @@ function pinpointBrush(sigma, magnitude, row, col) {
     var index;
     var gFilter;
 
-    for (var i = -fWidth; i <= fWidth; i++) {
-        for (var j = -fWidth; j <= fWidth; j++) {
-            newRow = row + i;
-            newCol = col + j;
+    if (sigma < 0.6) {
+        index = (row * GRID_SIZE) + col;
+        rectangles[index].position.y += magnitude;
+    } else {
+        for (var i = -fWidth; i <= fWidth; i++) {
+            for (var j = -fWidth; j <= fWidth; j++) {
+                newRow = row + i;
+                newCol = col + j;
 
-            if (newRow >= 0 && newRow < GRID_SIZE && newCol >= 0 && newCol < GRID_SIZE) {
-                index = (newRow * GRID_SIZE) + newCol;
-                rectangles[index].position.y += magnitude;
+                if (newRow >= 0 && newRow < GRID_SIZE && newCol >= 0 && newCol < GRID_SIZE) {
+                    index = (newRow * GRID_SIZE) + newCol;
+                    rectangles[index].position.y += magnitude;
+                }
             }
         }
     }
@@ -332,8 +340,31 @@ function blurBrush(magnitude, row, col) {
 }
 
 
-function gaussianBlurBrush(sigma, magnitude, row, col) {
-    //Todo
+function colorBrush(sigma, color, row, col) {
+    var c = parseHex(color);
+    var fWidth = Math.ceil(sigma);
+    var fSize = (fWidth * 2) + 1;
+    var newRow = 0;
+    var newCol = 0;
+    var index;
+
+    if (sigma < 1) {
+        index = (row * GRID_SIZE) + col;
+        rectangles[index].material.color.setHex(c);
+    } else {
+        for (var i = -fWidth; i <= fWidth; i++) {
+            for (var j = -fWidth; j <= fWidth; j++) {
+                newRow = row + i;
+                newCol = col + j;
+
+                if (newRow >= 0 && newRow < GRID_SIZE && newCol >= 0 && newCol < GRID_SIZE) {
+                    index = (newRow * GRID_SIZE) + newCol;
+                    rectangles[index].material.color.setHex(c);
+                }
+
+            }
+        }
+    }
 }
 
 function createGaussianFilter(sigma, magnitude) {
@@ -398,7 +429,7 @@ function setUpGUI() {
     f0.add(options, 'orbitViewTheta', 0, 360).listen();
     f0.add(options, 'orbitViewRadius', 100, 500);
     var f1 = gui.addFolder('Brush');
-    f1.add(options, 'brushType', ['Gaussian', 'Pinpoint', 'Blur']);
+    f1.add(options, 'brushType', ['Gaussian', 'Pinpoint', 'Blur', 'Color']);
     f1.add(options, 'brushSize', .5, 2).onChange(function (value) {
         brushSize = value;
     });
