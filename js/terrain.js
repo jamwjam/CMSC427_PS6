@@ -3,14 +3,12 @@ var object;
 
 var raycaster, SELECTED, INTERSECTED;
 var mouse, objects;
-var theta, radius;
 var controls;
 
 var MOUSEDOWN, MOUSEUP, MOUSEBTN;
 
 var RECT_SIZE = 15;
 var RECT_HEIGHT = 256;
-
 var GRID_SIZE = 32;
 var NUM_CUBES = GRID_SIZE * GRID_SIZE;
 
@@ -18,10 +16,36 @@ var filterType;
 
 var rectangles = [];
 
-var brushSize, brushMagnitude;
-
 var stats;
 
+var SHADOW_MAP_WIDTH = 2048,
+    SHADOW_MAP_HEIGHT = 1024;
+var light;
+
+var guiOption = function () {
+    this.color0 = "#ffae23";
+    this.viewMode = 'Orbit Mode';
+    this.brushType = 'Gaussian';
+    this.brushSize = 1.0;
+    this.brushMagnitude = 10;
+    this.blurMagnitude = 0.13;
+    this.orbitViewRadius = 400;
+    this.orbitViewTheta = 0;
+    this.reset = function () {
+        reset();
+    };
+    this.toggleShadow = function () {
+        castShadow();
+    };
+    this.castShadow = true;
+    this.singleColor = function () {
+        setSingleColor();
+    };
+    this.randomColor = function () {
+        setRandomColor();
+    };
+};
+var options = new guiOption();
 $.ready(main());
 
 
@@ -41,14 +65,17 @@ function init() {
     renderer.setClearColor(0xf0f0f0);
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.sortObjects = false;
+
+    renderer.shadowMapEnabled = true;
+    renderer.shadowMapType = THREE.PCFShadowMap;
+
     document.body.appendChild(renderer.domElement);
 
     camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 1, 10000);
     camera.position.z = 400;
 
     filterType = 0;
-    theta = 0;
-    radius = 100;
+
     scene = new THREE.Scene();
     mouse = new THREE.Vector2();
     raycaster = new THREE.Raycaster();
@@ -56,13 +83,33 @@ function init() {
     objects = [];
     rectangles = [];
 
-    var light = new THREE.DirectionalLight(0xffffff, 1);
-    light.position.set(1, 1, 1).normalize();
+
+    // LIGHTS
+
+    var ambient = new THREE.AmbientLight(0x444444);
+    scene.add(ambient);
+    light = new THREE.SpotLight(0xffffff, 1, 0, Math.PI / 2, 1);
+    light.position.set(0, 1500, 1000);
+    light.target.position.set(0, 0, 0);
+
+    light.castShadow = true;
+
+    light.shadowCameraNear = 1200;
+    light.shadowCameraFar = 2500;
+    light.shadowCameraFov = 50;
+
+    //light.shadowCameraVisible = true;
+
+    light.shadowBias = 0.0001;
+    light.shadowDarkness = 0.5;
+
+    light.shadowMapWidth = SHADOW_MAP_WIDTH;
+    light.shadowMapHeight = SHADOW_MAP_HEIGHT;
+
     scene.add(light);
 
-    populateRectangles(scene);
 
-    brushSize = 0, brushMagnitude = 0;
+    populateRectangles(scene);
 
     document.addEventListener('mousemove', onDocumentMouseMove, false);
     document.addEventListener('mousedown', onDocumentMouseDown, false);
@@ -79,27 +126,41 @@ function onWindowResize() {
 function animate() {
     requestAnimationFrame(animate);
     stats.begin();
-    controls.update();
     render();
     stats.end();
 }
 
 function render() {
+
+    // Toggle castShadow
+
+    // View Mode
+    switch (options.viewMode) {
+    case 'Orbital Control':
+        controls.update();
+        break;
+    case 'Orbit Mode':
+
+        options.orbitViewTheta += 0.1;
+        if (options.orbitViewTheta >= 360) {
+            options.orbitViewTheta = 0;
+        }
+        camera.position.x = options.orbitViewRadius * Math.sin(THREE.Math.degToRad(options.orbitViewTheta));
+        camera.position.y = options.orbitViewRadius;
+        camera.position.z = options.orbitViewRadius * Math.cos(THREE.Math.degToRad(options.orbitViewTheta));
+        camera.lookAt(scene.position);
+        camera.updateMatrixWorld();
+        break;
+    }
+
+    // Brush Action
     if (MOUSEDOWN) {
         raycaster.setFromCamera(mouse, camera);
         var intersects = raycaster.intersectObjects(scene.children);
 
-        if (intersects.length >= 1) {
+        if (intersects.length >= 1 && MOUSEBTN == 1) {
             INTERSECTED = intersects[0].object;
-
-            switch (MOUSEBTN) {
-            case 1:
-                applyBrush(3);
-                break;
-            case 3:
-                applyBrush(1);
-                break;
-            }
+            applyBrush(3);
         }
     }
     renderer.render(scene, camera);
@@ -116,10 +177,16 @@ function populateRectangles(parent) {
 
     for (var i = 0; i < NUM_CUBES; i++) {
 
+        //        var material = new THREE.MeshPhongMaterial({
+        //            color: 0xdddddd,
+        //            specular: 0x009900,
+        //            shininess: 30,
+        //            shading: THREE.FlatShading
+        //        });
         var material = new THREE.MeshLambertMaterial({
             color: Math.random() * 0xffffff
+                //color: 0xAAAAAA
         });
-
 
         if ((i % GRID_SIZE) === 0) {
             col = 1;
@@ -133,8 +200,9 @@ function populateRectangles(parent) {
 
         rectangle = new THREE.Mesh(geometry, material);
 
-        //        console.log(x + ' ' + z);
         rectangle.position.set(x, -255, z);
+        rectangle.castShadow = options.castShadow;
+        rectangle.receiveShadow = options.castShadow;
 
         rectangles.push(rectangle);
 
@@ -159,7 +227,7 @@ function onDocumentMouseUp(event) {
     MOUSEUP = true;
 }
 
-function applyBrush(filterType) {
+function applyBrush() {
 
     var x = INTERSECTED.position.x;
     var z = INTERSECTED.position.z;
@@ -173,13 +241,17 @@ function applyBrush(filterType) {
     var strength = 1 / 49;
     var width = 3;
 
-    switch (filterType) {
-    case 1:
-        gaussianBrush(1, -20, row, col);
+    switch (options.brushType) {
+    case 'Gaussian':
+        gaussianBrush(options.brushSize, options.brushMagnitude, row, col);
         break;
-    case 3:
-        gaussianBrush(1, 20, row, col);
+    case 'Pinpoint':
+        pinpointBrush(options.brushSize, options.brushMagnitude, row, col);
         break;
+    case 'Blur':
+        blurBrush(options.blurMagnitude, row, col);
+        break;
+
     }
 }
 
@@ -207,18 +279,61 @@ function gaussianBrush(sigma, magnitude, row, col) {
     }
 }
 
-function blurBrush(sigma, magnitude, row, col) {
-    //Todo
+function pinpointBrush(sigma, magnitude, row, col) {
+    var fWidth = Math.ceil(sigma * 2);
+    var fSize = (fWidth * 2) + 1;
+    var newRow = 0;
+    var newCol = 0;
+    var index;
+    var gFilter;
+
+    for (var i = -fWidth; i <= fWidth; i++) {
+        for (var j = -fWidth; j <= fWidth; j++) {
+            newRow = row + i;
+            newCol = col + j;
+
+            if (newRow >= 0 && newRow < GRID_SIZE && newCol >= 0 && newCol < GRID_SIZE) {
+                index = (newRow * GRID_SIZE) + newCol;
+                rectangles[index].position.y += magnitude;
+            }
+        }
+    }
 }
+
+function blurBrush(magnitude, row, col) {
+    var fWidth = 1;
+    var fSize = (fWidth * 2) + 1;
+
+    var newRow = 0;
+    var newCol = 0;
+    var index = (row * GRID_SIZE) + col;
+    var fIndex = 0;
+    var gFilter;
+
+    var neighbors;
+    var sum = 0;
+
+    ;
+    for (var i = -fWidth; i <= fWidth; i++) {
+        for (var j = -fWidth; j <= fWidth; j++) {
+
+            newRow = row + i;
+            newCol = col + j;
+
+            if (newRow >= 0 && newRow < GRID_SIZE && newCol >= 0 && newCol < GRID_SIZE) {
+                findex = (newRow * GRID_SIZE) + newCol;
+
+                sum += (rectangles[findex].position.y + 255) * magnitude;
+            }
+        }
+    }
+    //console.log(sum);
+    rectangles[index].position.y = sum - 255;
+}
+
 
 function gaussianBlurBrush(sigma, magnitude, row, col) {
     //Todo
-}
-
-function applyFilter(filterType) {
-
-    //Todo    
-
 }
 
 function createGaussianFilter(sigma, magnitude) {
@@ -238,31 +353,69 @@ function createGaussianFilter(sigma, magnitude) {
 
     for (var i = 0; i < gFilter.length; i++) {
         gFilter[i] = (gFilter[i] / sum) * magnitude;
-        //         console.log(gFilter[i]);
+        //console.log(gFilter[i]);
     }
 
     return gFilter;
 }
 
+function castShadow() {
+    if (options.castShadow) {
+        options.castShadow = false;
+    } else {
+        options.castShadow = true;
+    }
+    for (var i = 0; i < rectangles.length; i++) {
+        rectangles[i].castShadow = options.castShadow;
+        rectangles[i].recieveShadow = options.castShadow;
+    }
+}
+
+function setSingleColor() {
+    var c = parseHex(options.color0);
+    for (var i = 0; i < rectangles.length; i++) {
+        rectangles[i].material.color.setHex(c);
+    }
+}
+
+function setRandomColor() {
+    for (var i = 0; i < rectangles.length; i++) {
+        rectangles[i].material.color.setHex(Math.random() * 0xffffff);
+    }
+}
+
+function reset() {
+    for (var i = 0; i < rectangles.length; i++) {
+        rectangles[i].position.y = -255;
+    }
+}
+
 function setUpGUI() {
     var gui = new dat.GUI();
-    var options = {
-        viewMode: 'Orbital Control',
-        brushType: 'Gaussian',
-        brushSize: 0.5,
-        brushMagnitude: 10
-    };
 
-    gui.add(options, 'viewMode', ['Orbital Control', 'Orbit Mode', 'WASD Mode']);
 
+    var f0 = gui.addFolder('View Mode');
+    f0.add(options, 'viewMode', ['Orbital Control', 'Orbit Mode', 'Stationary Mode']);
+    f0.add(options, 'orbitViewTheta', 0, 360).listen();
+    f0.add(options, 'orbitViewRadius', 100, 500);
     var f1 = gui.addFolder('Brush');
-    f1.add(options, 'brushType', ['Gaussian', 'Pinpoint']);
+    f1.add(options, 'brushType', ['Gaussian', 'Pinpoint', 'Blur']);
     f1.add(options, 'brushSize', .5, 2).onChange(function (value) {
         brushSize = value;
     });
-    f1.add(options, 'brushMagnitude', -20, 20).onChange(function (value) {
+    f1.add(options, 'brushMagnitude', -40, 40).onChange(function (value) {
         brushMagnitude = value;
     });
+    f1.add(options, 'blurMagnitude', .10, .15);
+
+    var f2 = gui.addFolder('Lighting');
+    f2.add(options, 'toggleShadow');
+    var f3 = gui.addFolder('Color');
+    f3.addColor(options, 'color0').name('Color');
+    f3.add(options, 'singleColor');
+    f3.add(options, 'randomColor');
+
+    gui.add(options, 'reset').name('Reset');
 }
 
 function setUpStats(parent) {
@@ -272,4 +425,8 @@ function setUpStats(parent) {
     stats.domElement.style.top = '0px';
     stats.setMode(0);
     parent.appendChild(stats.domElement);
+}
+
+function parseHex(hex) {
+    return '0x' + hex.slice(1);
 }
