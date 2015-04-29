@@ -115,7 +115,9 @@ function init() {
 
 
     populateRectangles(scene);
+    showCaseRectangles();
 
+    document.addEventListener('keydown', onDocumentKeyDown, false);
     document.addEventListener('mousemove', onDocumentMouseMove, false);
     document.addEventListener('mousedown', onDocumentMouseDown, false);
     document.addEventListener('mouseup', onDocumentMouseUp, false);
@@ -197,13 +199,53 @@ function populateRectangles(parent) {
 
         rectangle = new THREE.Mesh(geometry, material);
 
-        rectangle.position.set(x, -255, z);
+        rectangle.position.set(x, -3000, z);
         rectangle.castShadow = options.castShadow;
         rectangle.receiveShadow = options.castShadow;
 
         rectangles.push(rectangle);
 
         parent.add(rectangle);
+    }
+}
+
+function onDocumentKeyDown(event) {
+    alert(event.which);
+    switch (event.which) {
+
+    case 66:
+        for (var i = 0; i < rectangles.length; i++) {
+            TweenMax.to(rectangles[i].position, 1 + Math.random() * 1, {
+                y: 100,
+                ease: SteppedEase.config(12 + Math.ceil(Math.random() * 5)),
+            });
+        }
+        break;
+    case 67:
+        for (var i = 0; i < rectangles.length; i++) {
+            TweenMax.to(rectangles[i].position, 1 + Math.random() * 2, {
+                y: 100,
+                ease: Elastic.easeOut,
+            });
+        }
+        break;
+    case 86:
+        var t1 = new TimelineLite();
+        for (var i = 0; i < rectangles.length; i++) {
+            t1.to(rectangles[i].position, .01, {
+                y: 10,
+                ease: Linear.easeNone,
+            });
+        }
+        t1.play();
+        break;
+    case 88:
+        TweenMax.to(rectangles[0].position, 1, {
+            y: 10,
+            ease: Elastic.easeOut,
+        });
+        //xrectangles[0].position.y += 20;
+        break;
     }
 }
 
@@ -412,9 +454,23 @@ function setRandomColor() {
     }
 }
 
+function showCaseRectangles() {
+    for (var i = 0; i < rectangles.length; i++) {
+        TweenMax.to(rectangles[i].position, 1 + Math.random() * 1.5, {
+            y: -105,
+            //ease: SteppedEase.config(12 + Math.ceil(Math.random() * 5)),
+            //ease: Elastic.easeOut,
+            ease: Power4.easeInOut,
+        });
+    }
+}
+
 function reset() {
     for (var i = 0; i < rectangles.length; i++) {
-        rectangles[i].position.y = -255;
+        TweenMax.to(rectangles[i].position, 1 + Math.random() * 1, {
+            y: -155,
+            ease: Elastic.easeOut,
+        });
     }
 }
 
