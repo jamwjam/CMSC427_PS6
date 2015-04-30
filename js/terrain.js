@@ -1,26 +1,18 @@
-var camera, scene, renderer;
+var camera, scene, renderer, light, rectangles = [];
 
-var raycaster, SELECTED, INTERSECTED;
-var mouse;
-var controls;
+var raycaster, INTERSECTED;
+var mouse, controls, stats;
 var container;
 
 var MOUSEDOWN, MOUSEUP, MOUSEBTN;
 
-var RECT_SIZE = 15;
-var RECT_HEIGHT = 256;
-var GRID_SIZE = 27;
+var RECT_SIZE = 15,
+    RECT_HEIGHT = 256,
+    GRID_SIZE = 27;
 var NUM_CUBES = GRID_SIZE * GRID_SIZE;
-
-var filterType;
-
-var rectangles = [];
-
-var stats;
 
 var SHADOW_MAP_WIDTH = 2048,
     SHADOW_MAP_HEIGHT = 1024;
-var light;
 
 var guiOption = function () {
     this.color0 = "#ffae23";
@@ -45,7 +37,9 @@ var guiOption = function () {
         setRandomColor();
     };
 };
+
 var options = new guiOption();
+
 $.ready(main());
 
 function main() {
@@ -63,24 +57,18 @@ function init() {
 
     document.body.appendChild(container);
 
-
     renderer = new THREE.WebGLRenderer();
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setClearColor(0xf0f0f0);
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.sortObjects = false;
-
     renderer.shadowMapEnabled = true;
     renderer.shadowMapType = THREE.PCFShadowMap;
-
-    //document.body.appendChild(renderer.domElement);
 
     container.appendChild(renderer.domElement);
 
     camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 1, 10000);
     camera.position.z = 400;
-
-    filterType = 0;
 
     scene = new THREE.Scene();
     mouse = new THREE.Vector2();
@@ -88,31 +76,22 @@ function init() {
     controls = new THREE.OrbitControls(camera, renderer.domElement);
     rectangles = [];
 
-
     // LIGHTS
-
     var ambient = new THREE.AmbientLight(0x444444);
     scene.add(ambient);
     light = new THREE.SpotLight(0xffffff, 1, 0, Math.PI / 2, 1);
     light.position.set(0, 1500, 1000);
     light.target.position.set(0, 0, 0);
-
     light.castShadow = true;
-
     light.shadowCameraNear = 1200;
     light.shadowCameraFar = 2500;
     light.shadowCameraFov = 50;
-
-    //light.shadowCameraVisible = true;
-
     light.shadowBias = 0.0001;
     light.shadowDarkness = 0.5;
-
     light.shadowMapWidth = SHADOW_MAP_WIDTH;
     light.shadowMapHeight = SHADOW_MAP_HEIGHT;
 
     scene.add(light);
-
 
     populateRectangles(scene);
     showCaseRectangles();
@@ -184,7 +163,6 @@ function populateRectangles(parent) {
 
         var material = new THREE.MeshLambertMaterial({
             color: Math.random() * 0xffffff
-                //color: 0xAAAAAA
         });
 
         if ((i % GRID_SIZE) === 0) {
@@ -198,11 +176,9 @@ function populateRectangles(parent) {
         z = (((GRID_SIZE * RECT_SIZE) / 2) - ((RECT_SIZE) * row) + (RECT_SIZE / 2));
 
         rectangle = new THREE.Mesh(geometry, material);
-
         rectangle.position.set(x, -3000, z);
         rectangle.castShadow = options.castShadow;
         rectangle.receiveShadow = options.castShadow;
-
         rectangles.push(rectangle);
 
         parent.add(rectangle);
@@ -210,7 +186,7 @@ function populateRectangles(parent) {
 }
 
 function onDocumentKeyDown(event) {
-    alert(event.which);
+
     switch (event.which) {
 
     case 66:
@@ -229,10 +205,12 @@ function onDocumentKeyDown(event) {
             });
         }
         break;
+    case 80:
+        break;
     case 86:
         var t1 = new TimelineLite();
         for (var i = 0; i < rectangles.length; i++) {
-            t1.to(rectangles[i].position, .01, {
+            t1.to(rectangles[i].position, .005, {
                 y: 10,
                 ease: Linear.easeNone,
             });
@@ -293,7 +271,6 @@ function applyBrush() {
     case 'Color':
         colorBrush(options.brushSize, options.color0, row, col);
         break;
-
     }
 }
 
@@ -340,7 +317,7 @@ function pinpointBrush(sigma, magnitude, row, col) {
 
                 if (newRow >= 0 && newRow < GRID_SIZE && newCol >= 0 && newCol < GRID_SIZE) {
                     index = (newRow * GRID_SIZE) + newCol;
-                    rectangles[index].position.y += magnitude;
+                    rectangles[index].position.y += magnitude / 6;
                 }
             }
         }
@@ -360,7 +337,6 @@ function blurBrush(magnitude, row, col) {
     var neighbors;
     var sum = 0;
 
-    ;
     for (var i = -fWidth; i <= fWidth; i++) {
         for (var j = -fWidth; j <= fWidth; j++) {
 
@@ -423,7 +399,6 @@ function createGaussianFilter(sigma, magnitude) {
 
     for (var i = 0; i < gFilter.length; i++) {
         gFilter[i] = (gFilter[i] / sum) * magnitude;
-        //console.log(gFilter[i]);
     }
 
     return gFilter;
@@ -457,10 +432,15 @@ function setRandomColor() {
 function showCaseRectangles() {
     for (var i = 0; i < rectangles.length; i++) {
         TweenMax.to(rectangles[i].position, 1 + Math.random() * 1.5, {
-            y: -105,
+            y: -85,
             //ease: SteppedEase.config(12 + Math.ceil(Math.random() * 5)),
             //ease: Elastic.easeOut,
             ease: Power4.easeInOut,
+        });
+        TweenMax.to(rectangles[i].position, 1 + Math.random() * 1, {
+            y: -155,
+            delay: 3,
+            ease: Elastic.easeOut,
         });
     }
 }
